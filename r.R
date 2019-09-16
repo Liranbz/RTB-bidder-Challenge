@@ -2,6 +2,7 @@
 #-------------------------------------------email- bzliran@gmail.com----------------------------------------
 
 rm(list=ls())
+install.packages("dplyr")
 library(dplyr)
 library(data.table)
 library(mice)
@@ -18,7 +19,7 @@ data<-as.data.frame(data,stringsAsFactors =FALSE)
 str(data)
 names(data)
 #-----------------------------Data preparation--------------------------------------------
-data$product<-as.factor(data$product)
+#data$subProduct<-as.numeric(data$subProduct)
 data$eDate<-as.Date(as.character(data$eDate,format="%y/%m/%d")) # Formatting date as date format from string
 
 # Checking how many NA are there
@@ -30,7 +31,9 @@ summary(data$clicks)
 boxplot(data$clicks)
 outliers <- boxplot(data$clicks, plot=FALSE)$out
 data[which(data$clicks %in% outliers),]
+
 clean_data <- data[-which(data$clicks %in% outliers),]
+data<-clean_data
 boxplot(clean_data$clicks)
 summary(clean_data$clicks)
 data$log_clicks<-(log10(data$clicks))
@@ -62,46 +65,32 @@ Train_test_division=function(train_fraction,df){
   Test=df[Test_indices,]
   return(list(Train=Train,Test=Test))
 }
-Train_test_Data=Train_test_division(0.75,data)
+Train_test_Data=Train_test_division(0.6,data)
 Train=Train_test_Data$Train
 Test=Train_test_Data$Test
-#---------------------------------------Machine Learning models-------------------------
-
-library(caret)
-library(foreach)
-library(doParallel)
-#--------train control-----
-trCtrl <- trainControl(
-  method = "repeatedcv"
-  , number = 2
-  , repeats = 5
-  , allowParallel = TRUE
-)
 
 
-#----------------------------------------model_xgbLinear with some features-------------------------------------------
-model_xgbLinear1<-train(form = Train$Log_impressions~., data=Train, trControl = trCtrl,method='xgbLinear')
-
-summary(model_xgbLinear1) # summarizing the model
-print(model_xgbLinear1)
-plot(model_xgbLinear1)
-varImp(object=model_xgbLinear1)
-plot(varImp(object=model_xgbLinear1),main="model_xgbLinear - Variable Importance, 7 features")
-
-#Predictions
-predictions1<-predict.train(object=model_xgbLinear1,Test[,-Test$Log_impressions],type="raw")
-RMSE_model_xgbLinear1=RMSE(predictions1,Test$Log_impressions)
+#---------------------------------------Machine Learning models------------------------
 
 #----------------------------------------RF- with features-------------------------------------------
+install.packages("randomForest")
+library(randomForest)
 
-model_rf<-train(form = Train$Log_impressions~., data=Train, trControl = trCtrl,method='rf')
+names(Train)
+gc()
+memory.limit(size = 56000)
 
-summary(model_rf)
-print(model_rf)
-plot(model_rf)
-varImp(object=model_rf)
-plot(varImp(object=model_rf),main="model_rf - Variable Importance")
+# Create a Random Forest model with default parameters
+model1 <- randomForest(Log_impressions ~ eDate+channel+os+networkType+deviceType+publisherCategory+advertiserCategory+advMaturity+rate+clicks+AverageWinPrice..CPM., data = Train, importance = TRUE)
+model1
+plot(model1)
+importance(model1)
+varImpPlot(model1)
+table(predict(model1),Train$Log_impressions)
 
-#Predictions
-predictions_rf<-predict.train(object=model_rf,Test[,-Test$Log_impressions],type="raw")
-RMSE_model_xgbLinear1=RMSE(predictions_rf,Test$Log_impressions)
+# Fine tuning parameters of Random Forest model
+tune.rf <- tuneRF(Train[,-c(1,5,11:14,16,18)],mtry = 2,Train[,19], stepFactor=0.5)
+
+
+model2 <- randomForest(Log_impressions ~ eDate+channel+os+networkType+deviceType+publisherCategory+advertiserCategory+advMaturity+rate+clicks+AverageWinPrice..CPM., data = Train, ntree = 5000, mtry = 6, importance = TRUE)
+model2
