@@ -43,8 +43,8 @@ data$Log_impressions<-(log10(data$impressions))
 
 summary(data$Log_impressions)
 #boxplot(data$clicks)
-
-
+copy_data<-data
+data<-data[sample(nrow(data), 40000), ]
 #data<-data[,-c(1:2)]
 
 #--------------------------------------Create sets for train and test--------------------------------------
@@ -89,8 +89,11 @@ varImpPlot(model1)
 table(predict(model1),Train$Log_impressions)
 
 # Fine tuning parameters of Random Forest model
-tune.rf <- tuneRF(Train[,-c(1,5,11:14,16,18)],mtry = 2,Train[,19], stepFactor=0.5)
+tune.rf <- tuneRF(Train[,-c(1,5,11:14,16,18)],Train[,19], stepFactor=0.5)
+print(tune.rf)
 
-
-model2 <- randomForest(Log_impressions ~ eDate+channel+os+networkType+deviceType+publisherCategory+advertiserCategory+advMaturity+rate+clicks+AverageWinPrice..CPM., data = Train, ntree = 5000, mtry = 6, importance = TRUE)
+model2 <- randomForest(Log_impressions ~ eDate+channel+os+networkType+deviceType+publisherCategory+advertiserCategory+advMaturity+rate+clicks+AverageWinPrice..CPM., data = Train, ntree = 501, mtry = 6, importance = TRUE)
 model2
+plot(model2)
+importance(model2)
+varImpPlot(model2)
